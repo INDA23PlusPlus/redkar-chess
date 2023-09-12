@@ -1,0 +1,32 @@
+Board representation
+Game history
+Pieces
+Basic moves:
+        Pawn:
+                Move forward (twice if its first move)
+                Diagonal capture
+        Bishop:
+                Diagonal INF in all directions
+        Knight:
+                Two in one dir, one in perpendicular dir
+        Rook:
+                Straight INF in all directions
+        Queen:
+                Diagonal and Straight INF in all directions
+        King:
+                One step in all directions
+
+Get valid moves or take input from user and check if move valid:
+        1:
+                get all possible moves and put into list
+                Get input from user and check if move in list
+        2:
+                Get input from user and check if it is valid
+        
+        1 is faster if user is gonna make more move queries than possible valid moves
+        However, this is probably negligible
+
+Enum for Invalid move query maybe
+
+Later: 
+
