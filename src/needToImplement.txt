@@ -43,9 +43,14 @@ Enum for Invalid move query maybe
         "Piece does not move like that"
         Putting your own king in check
 
-
 If in check in and len(legal_moves) == 0:
         You are checkmated
 
 Later: 
+
+keep a hasMoved bool value for rooks and kings for castling rights
+promotion maybe auto queen
+en passant {
+        was there a pawn that moved up 2, if so save position
+}
 
