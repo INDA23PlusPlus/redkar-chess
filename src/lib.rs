@@ -135,6 +135,9 @@ impl Game {
             else {0}
         };
 
+        let saved_start: Option::<Piece> = self.board[mv.start_y][mv.start_x].clone();
+        let saved_end: Option::<Piece> = self.board[mv.end_y][mv.end_x].clone();
+
         match the_piece.piece {
             /* check if move is even legal */
             // check if it right type of move 
@@ -229,10 +232,22 @@ impl Game {
             }
         }
 
-        
-
-        /* FOR checking if a move is legal */ 
         // remember stuff so you can undo the move
+        // if found enemy pieces, means king is still checked, and must undo move
+        if inCheck() { 
+            self.board[mv.start_y][mv.start_x] = saved_start;
+            self.board[mv.end_y][mv.end_x] = saved_end;
+        }
+
+        // else continue to mate check
+        let safe_move: bool = false;
+        for i in 1..8
+
+        // todo! : check if position is a mate
+    }
+
+    pub inCheck(&mut self) {
+        /* FOR checking if a move is legal */ 
         // make a copy of the board 
         let tempBoard = self.board.clone();
         // find king
@@ -277,13 +292,7 @@ impl Game {
                 break 'outer;
             }
         }
-        // if found enemy pieces, means king is still checked, and must undo move
-        if checked { 
-             
-        }
-        // else continue to mate check
-
-        // todo! : check if position is a mate
     }
+
 
 }
