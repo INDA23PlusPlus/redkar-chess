@@ -20,19 +20,26 @@ pub struct Piece {
     color: Color, 
 }
 
+/*
 pub struct MoveType { 
     normal, 
     // promotion,
     // en_passant,
     // castling,
 }
+*/
 
 pub struct Move {
     start_x: usize,
     start_y: usize,
     end_x: usize,
     end_y: usize,
-    movetype: MoveType
+}
+
+
+pub struct MoveType {
+    capture_or_pawn, 
+    other, 
 }
 
 pub enum MoveError {
@@ -49,8 +56,7 @@ pub enum MoveError {
 pub struct Game {
     board: [[Option<Piece>; 8]; 8],
     turn: Color, 
-    inCheck: bool, 
-    move_history: Vec<Move>, /* will be needed to check whether draw can be claimed */
+    move_history: Vec<MoveType>, /* will be needed to check whether draw can be claimed */
 }
 
 impl Game {
@@ -86,18 +92,82 @@ impl Game {
             }
 
             turn: White,
-            inCheck: false,
             move_history: Vec::new(),
         }
     }
     /* should perform a move if possible */
-    pub fn do_move(&mut self, mv: Move) -> result::Result<Option<Color>, MoveError>> {
+    pub fn do_move(&mut self, mv: Move) {
+
+        // if found enemy pieces, means king is still checked, and must undo move
+
+        if !legal_movement(mv) {
+           // return some error  
+        }
+
+        let saved_start: Option<Piece> = self.board[mv.start_y][mv.start_x].clone();
+        let saved_end: Option<Piece> = self.board[mv.end_y][mv.end_x].clone();
+
+
+        // potentially temporarily make the move
+        self.board[mv.start_y][mv.start_x] = Option<Piece>::None;
+        self.board[mv.end_y][mv.end_x] = the_piece;
+
+        if inCheck(self.turn) { 
+            self.board[mv.start_y][mv.start_x] = saved_start;
+            self.board[mv.end_y][mv.end_x] = saved_end;
+            // return some inCheck error
+        }
+
+        // else continue to mate check
+        let safe_move: bool = false;
+
+        // todo! : check if position is a mate
+        // i'm sure there is a better way or writing this mate check. The complexity is through the
+        // roof here.
+        'move_gen: for org_Y in 1..8 {
+            for org_X in 1..8 {
+                for dest_Y in 1..8 {
+                    for dest_X in 1..8 {
+                        let cur_move: Move = Move{start_x: org_X, start_y: org_Y, end_x: dest_X, end_y: dest_Y};
+                        if legal_movement(&mut self, cur_move) {
+                            safe_move = true;
+                            break 'move_gen;
+                        }
+                    }
+                }
+            }
+        }
+        if !safe_move {
+            // self.turn has won
+            // signal end of game or something
+        }
+        else {
+            if saved_start.unwrap() == PieceType::Pawn {
+                self.move_history.push(MoveType::capture_or_pawn);
+            }
+            else {
+                match saved_end {
+                    None => {
+                        self.move_history.push(MoveType::capture_or_pawn);
+                    }, 
+                    _ => {
+                        self.move_history.push(MoveType::other);
+                    }
+                }
+            }
+        }
+    }
+
+    // checks for move legality
+    pub fn legal_movement(brd: Board, mv: Move) -> result::Result<Option<Color>, MoveError>> {
         /* check possible mv errors in order */
         let board_y = 0..8;
         let board_x = 0..8;
+        // if the position doesnt change
         if mv.start_x == mv.end_x && mv.start_y == mv.end_y { 
             return Err(MoveError::movement);
         }
+        // if the moves is in bounds
         if !board_x.contains(mv.start_x) || !board_x.contains(mv.end_x) || !board_y.contains(mv.start_y) || !board_y.contains(mv.end_y) {
             return Err(MoveError::outsideBoard);
         }
@@ -135,9 +205,6 @@ impl Game {
             else {0}
         };
 
-        let saved_start: Option::<Piece> = self.board[mv.start_y][mv.start_x].clone();
-        let saved_end: Option::<Piece> = self.board[mv.end_y][mv.end_x].clone();
-
         match the_piece.piece {
             /* check if move is even legal */
             // check if it right type of move 
@@ -157,15 +224,11 @@ impl Game {
                     }
                 }
                 // else do the move;
-                self.board[mv.start_y][mv.start_x] = Option<Piece>::None;
-                self.board[mv.end_y][mv.end_x] = the_piece;
             }
             PieceType::Knight => {
-                self.board[mv.start_y][mv.start_x] = Option<Piece>::None;
-                self.board[mv.end_y][mv.end_x] = the_piece;
+                // should always have legal movement at this stage
             }
             PieceType::Bishop => {
-
                 if abs(mv.end_y - mv.start_y) != abs(mv.end_x - mv.start_x) {
                     return Err(MoveError::movement);
                 }
@@ -182,8 +245,8 @@ impl Game {
                     curX += dy;
                 }
 
-                self.board[mv.start_y][mv.start_x] = Option<Piece>::None;
-                self.board[mv.end_y][mv.end_x] = the_piece;
+                //self.board[mv.start_y][mv.start_x] = Option<Piece>::None;
+                //self.board[mv.end_y][mv.end_x] = the_piece;
             }
             PieceType::Rook => {
                 if mv.end_y - mv.start_y != 0 && mv.end_x - mv.end_x != 0 { 
@@ -201,8 +264,8 @@ impl Game {
                     curX += dx;
                     curX += dy;
                 }
-                self.board[mv.start_y][mv.start_x] = Option<Piece>::None;
-                self.board[mv.end_y][mv.end_x] = the_piece;
+                //self.board[mv.start_y][mv.start_x] = Option<Piece>::None;
+                //self.board[mv.end_y][mv.end_x] = the_piece;
             }
             PieceType::Queen => {
                 /* todo! : need to check if there is something in between */
@@ -222,40 +285,28 @@ impl Game {
                     curX += dx;
                     curX += dy;
                 }
-                self.board[mv.start_y][mv.start_x] = Option<Piece>::None;
-                self.board[mv.end_y][mv.end_x] = the_piece;
+                //self.board[mv.start_y][mv.start_x] = Option<Piece>::None;
+                //self.board[mv.end_y][mv.end_x] = the_piece;
             }
             PieceType::King => {
                 // check if the attempted move is dx = 2 (potential attempt to castle)
-                self.board[mv.start_y][mv.start_x] = Option<Piece>::None;
-                self.board[mv.end_y][mv.end_x] = the_piece;
+                // otherwise there should be no problem
+                //self.board[mv.start_y][mv.start_x] = Option<Piece>::None;
+                //self.board[mv.end_y][mv.end_x] = the_piece;
             }
         }
-
-        // remember stuff so you can undo the move
-        // if found enemy pieces, means king is still checked, and must undo move
-        if inCheck() { 
-            self.board[mv.start_y][mv.start_x] = saved_start;
-            self.board[mv.end_y][mv.end_x] = saved_end;
-        }
-
-        // else continue to mate check
-        let safe_move: bool = false;
-        for i in 1..8
-
-        // todo! : check if position is a mate
+        
     }
 
-    pub inCheck(&mut self) {
+    pub fn inCheck(&mut self, C: Color) -> bool {
         /* FOR checking if a move is legal */ 
         // make a copy of the board 
-        let tempBoard = self.board.clone();
         // find king
         let kingX: usize = 0;
         let kingY: usize = 0;
         'outer: for i in 1..8 {
             for j in 1..8 {
-               match tempBoard[i as usize][j as usize] {
+               match self.board[i as usize][j as usize] {
                    None => continue,
                    Some(p) => if p.color == self.turn && p.piece == King {
                         KingY = i;
@@ -266,7 +317,7 @@ impl Game {
             }
         }
         // cast a ray from the king in 8 directions 
-        let dir: [[usize; 2]; 4] = [[-1, -1], [-1, 0], [0, -1], [0,1], [1, 0], [-1, 1], [1, -1], [1, 1]];
+        let dir: [[usize; 2]; 8] = [[-1, -1], [-1, 0], [0, -1], [0,1], [1, 0], [-1, 1], [1, -1], [1, 1]];
         let checked: bool = false;
         'outer: for i in 1..8 {
             let curX = KingX;
@@ -283,7 +334,7 @@ impl Game {
             }
         }
         // check 1 knight move away
-        let knight_dir: [[usize; 2]; 4] = [[2, -1], [2, 1], [-2, -1], [-2, 1], [1, 2], [1, -2], [-1, 2], [-1, -2]];
+        let knight_dir: [[usize; 2]; 8] = [[2, -1], [2, 1], [-2, -1], [-2, 1], [1, 2], [1, -2], [-1, 2], [-1, -2]];
         'outer: for i in 1..8 {
             let curX = KingX + dir[i as usize][0];
             let curY = KingY + dir[i as usize][1];
@@ -293,6 +344,5 @@ impl Game {
             }
         }
     }
-
 
 }
