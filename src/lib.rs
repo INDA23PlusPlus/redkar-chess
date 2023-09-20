@@ -250,9 +250,10 @@ impl Game {
                }
             }
         }
-        // cast a ray from the king in 8 directions, then check 1 knight move away for a knight 
+        // cast a ray from the king in 8 directions 
         let dir: [[usize; 2]; 4] = [[-1, -1], [-1, 0], [0, -1], [0,1], [1, 0], [-1, 1], [1, -1], [1, 1]];
-        for i in 1..8 {
+        let checked: bool = false;
+        'outer: for i in 1..8 {
             let curX = KingX;
             let curY = KingY;
             let DX = dir[i as usize][0 as usize];
@@ -260,9 +261,26 @@ impl Game {
             while (0 < curX+DX && curX+DX < 8 && 0 < curY+DY && curY+DY < 8) {
                 curX += DX;
                 curY += DY;
+                if self.board[curY][curX] != None && self.board[curY][curX] != self.turn {
+                    checked = true;
+                    break 'outer;
+                }
+            }
+        }
+        // check 1 knight move away
+        let knight_dir: [[usize; 2]; 4] = [[2, -1], [2, 1], [-2, -1], [-2, 1], [1, 2], [1, -2], [-1, 2], [-1, -2]];
+        'outer: for i in 1..8 {
+            let curX = KingX + dir[i as usize][0];
+            let curY = KingY + dir[i as usize][1];
+            if self.board[curY][curX] != None && self.board[curY][curX].color != self.turn {
+                checked = true;
+                break 'outer;
             }
         }
         // if found enemy pieces, means king is still checked, and must undo move
+        if checked { 
+             
+        }
         // else continue to mate check
 
         // todo! : check if position is a mate
