@@ -507,4 +507,12 @@ mod tests {
         let fen_new_game = Game::game_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
         assert_eq!(base_new_game, fen_new_game);
     }
+
+    #[test]
+    pub fn check_new_game_wrong() {
+        let base_new_game = Game::new_game(); 
+        // let fen_new_game = Game::new_game();
+        let fen_new_game = Game::game_from_fen("Rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+        assert_eq!(base_new_game, fen_new_game);
+    }
 }
