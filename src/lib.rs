@@ -18,7 +18,7 @@ pub enum Color {
     White,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct Piece {
     piece: PieceType, 
     color: Color, 
@@ -126,7 +126,7 @@ impl Game {
             },
         };
         
-        let capture: bool = false;
+        let mut capture: bool = false;
 
         let end_square = match self.board[mv.start_y][mv.start_x] {
             None => Option::<Piece>::None, 
@@ -139,7 +139,7 @@ impl Game {
             }, 
         };
 
-        match self.legal_Movement(&mv, &the_piece, &end_square, &capture) { 
+        match self.legal_movement(&mv, &the_piece, &end_square, capture) { 
             Some(x) => {
                 return Err(x);
             }
@@ -157,23 +157,46 @@ impl Game {
         // BIG Todo! : the_piece is not in scope
         self.board[mv.end_y][mv.end_x] = the_piece;
 
-        if self.inCheck(self.turn) { 
+        if self.in_check() { 
             self.board[mv.start_y][mv.start_x] = saved_start;
             self.board[mv.end_y][mv.end_x] = saved_end;
-            // return some inCheck error
+            // return some in_check error
         }
 
         // else continue to mate check
-        let safe_move: bool = false;
+        let mut safe_move: bool = false;
 
         // i'm sure there is a better way or writing this mate check. The complexity is through the
         // roof here.
-        'move_gen: for org_Y in 1..8 {
-            for org_X in 1..8 {
-                for dest_Y in 1..8 {
-                    for dest_X in 1..8 {
-                        let cur_move: Move = Move{start_x: org_X, start_y: org_Y, end_x: dest_X, end_y: dest_Y};
-                        if self.legal_Movement(cur_move).is_none() {
+        'move_gen: for org_y in 1..8 {
+            for org_x in 1..8 {
+                for dest_y in 1..8 {
+                    for dest_x in 1..8 {
+                        let cur_move: Move = Move{start_x: org_x, start_y: org_y, end_x: dest_x, end_y: dest_y};
+                        let cur_piece = match self.board[org_y][org_x] {
+                            None => continue,
+                            Some(p) => if p.color != self.turn {
+                                continue
+                            }
+                            else {
+                                Some(p)
+                            },
+                        };
+                        
+                        let mut cur_capture: bool = false;
+
+                        let cur_end_square = match self.board[dest_y][dest_x] {
+                            None => Option::<Piece>::None, 
+                            Some(p) => if p.color == self.turn {
+                                continue 
+                            }
+                            else {
+                                cur_capture = true;
+                                Some(p)
+                            }, 
+                        };
+
+                        if self.legal_movement(&cur_move, &cur_piece, &cur_end_square, cur_capture).is_none() {
                             safe_move = true;
                             break 'move_gen;
                         }
@@ -215,7 +238,7 @@ impl Game {
             }
         }
         // check for 50 move draw rule, and force draw like in chess com
-        let pawn_capture_move: bool = false;
+        let mut pawn_capture_move: bool = false;
         for i in (self.move_history.len()-50..self.move_history.len()).rev() {
             if self.move_history[i as usize] == MoveType::CaptureOrPawn {
                 pawn_capture_move = true;
@@ -235,7 +258,7 @@ impl Game {
     }
 
     // checks for move legality
-    pub fn legal_Movement(&mut self, mv: &Move, the_piece: &Option<Piece>, end_square: &Option<Piece>, capture: &bool) -> Option<MoveError> {
+    pub fn legal_movement(&mut self, mv: &Move, the_piece: &Option<Piece>, end_square: &Option<Piece>, capture: bool) -> Option<MoveError> {
         /* check possible mv errors in order */
         //todo! come back here
         let board_y = 0..8;
@@ -245,36 +268,36 @@ impl Game {
             return Some(MoveError::Movement);
         }
         // if the moves is in bounds
-        if !board_x.contains(mv.start_x) || !board_x.contains(mv.end_x) || !board_y.contains(mv.start_y) || !board_y.contains(mv.end_y) {
+        if !board_x.contains(&mv.start_x) || !board_x.contains(&mv.end_x) || !board_y.contains(&mv.start_y) || !board_y.contains(&mv.end_y) {
             return Some(MoveError::OutsideBoard);
         }
         // todo! the_piece and end_square are of type Option<Piece>
-        let dx: usize = { 
-            if mv.end_x - mv.start_x > 0 {1}
-            else if mv.end_x - mv.start_x < 0 {-1}
+        let dx: isize = { 
+            if (mv.end_x as isize) - (mv.start_x as isize) > 0 {1}
+            else if (mv.end_x as isize) - (mv.start_x as isize) < 0 {-1}
             else {0}
         };
-        let dy: usize = { 
-            if mv.end_y - mv.start_y > 0 {1}
-            else if mv.end_y - mv.start_y < 0 {-1}
+        let dy: isize = { 
+            if (mv.end_y as isize) - (mv.start_y as isize) > 0 {1}
+            else if (mv.end_y as isize) - (mv.start_y as isize) < 0 {-1}
             else {0}
         };
 
-        match the_piece.piece {
+        match the_piece.unwrap().piece {
             /* check if move is even legal */
             // check if it right type of move 
             PieceType::Pawn => {
-                if (mv.end_x - mv.start_x).abs() != { if capture {1} else {0} } {
+                if (mv.end_x as isize - mv.start_x as isize).abs() != { if capture {1} else {0} } {
                     return Some(MoveError::Movement);
                 }
-                let yDif = mv.end_y - mv.start_y;
+                let y_dif = mv.end_y as isize - mv.start_y as isize;
                 if mv.start_y == 0 || mv.start_y == 7 {
-                    if yDif > { if self.turn == Color::White {2} else {-2} } {
+                    if y_dif > { if self.turn == Color::White {2} else {-2} } {
                         return Some(MoveError::Movement);
                     }
                 }
                 else {
-                    if yDif > { if self.turn == Color::White {1} else {-1} } {
+                    if y_dif > { if self.turn == Color::White {1} else {-1} } {
                         return Some(MoveError::Movement);
                     }
                 }
@@ -283,20 +306,20 @@ impl Game {
                 // should always have legal Movement at this stage
             }
             PieceType::Bishop => {
-                if (mv.end_y - mv.start_y).abs() != (mv.end_x - mv.start_x).abs() {
+                if (mv.end_y as isize - mv.start_y as isize).abs() != (mv.end_x as isize - mv.start_x as isize).abs() {
                     return Some(MoveError::Movement);
                 }
 
-                let curX = mv.start_x;
-                let curY = mv.start_y;
-                while (curX != mv.end_x) || (curY != mv.end_y) {
-                    if  (curX != mv.start_x) || (curY != mv.start_y) {
-                        if self.board[curY][curX].is_some() {
+                let mut cur_x = mv.start_x;
+                let mut cur_y = mv.start_y;
+                while (cur_x != mv.end_x) || (cur_y != mv.end_y) {
+                    if  (cur_x != mv.start_x) || (cur_y != mv.start_y) {
+                        if self.board[cur_y][cur_x].is_some() {
                             return Some(MoveError::BlockedPath);
                         }
                     }
-                    curX += dx;
-                    curX += dy;
+                    cur_x += dx as usize;
+                    cur_y += dy as usize;
                 }
 
             }
@@ -305,34 +328,34 @@ impl Game {
                     return Some(MoveError::Movement);
                 }
 
-                let curX = mv.start_x;
-                let curY = mv.start_y;
-                while (curX != mv.end_x) || (curY != mv.end_y) {
-                    if  (curX != mv.start_x) || (curY != mv.start_y) {
-                        if self.board[curY][curX].is_some() {
+                let mut cur_x = mv.start_x;
+                let mut cur_y = mv.start_y;
+                while (cur_x != mv.end_x) || (cur_y != mv.end_y) {
+                    if  (cur_x != mv.start_x) || (cur_y != mv.start_y) {
+                        if self.board[cur_y][cur_x].is_some() {
                             return Some(MoveError::BlockedPath);
                         }
                     }
-                    curX += dx;
-                    curX += dy;
+                    cur_x += dx as usize;
+                    cur_y += dy as usize;
                 }
             }
             PieceType::Queen => {
-                let Y = (mv.end_y - mv.start_y).abs();
-                let X = (mv.end_x - mv.start_x).abs();
+                let Y = (mv.end_y as isize - mv.start_y as isize).abs();
+                let X = (mv.end_x as isize - mv.start_x as isize).abs();
                 if cmp::max(X, Y) != cmp::min(X, Y) && cmp::min(X, Y) != 0 {
                     return Some(MoveError::Movement);
                 }
-                let curX = mv.start_x;
-                let curY = mv.start_y;
-                while (curX != mv.end_x) || (curY != mv.end_y) {
-                    if  (curX != mv.start_x) || (curY != mv.start_y) {
-                        if self.board[curY][curX].is_some() {
+                let mut cur_x = mv.start_x;
+                let mut cur_y = mv.start_y;
+                while (cur_x != mv.end_x) || (cur_y != mv.end_y) {
+                    if  (cur_x != mv.start_x) || (cur_y != mv.start_y) {
+                        if self.board[cur_y][cur_x].is_some() {
                             return Some(MoveError::BlockedPath);
                         }
                     }
-                    curX += dx;
-                    curX += dy;
+                    cur_x += dx as usize;
+                    cur_y += dy as usize;
                 }
             }
             PieceType::King => {
@@ -344,19 +367,19 @@ impl Game {
         return None;
     }
 
-    pub fn inCheck(&mut self) -> bool {
+    pub fn in_check(&mut self) -> bool {
         /* FOR checking if a move is legal */ 
         // make a copy of the board 
         // find king
-        let KingX: usize = 0;
-        let KingY: usize = 0;
+        let mut king_x: isize = 0;
+        let mut king_y: isize = 0;
         'outer: for i in 1..8 {
             for j in 1..8 {
                match self.board[i as usize][j as usize] {
                    None => continue,
                    Some(p) => if p.color == self.turn && p.piece == PieceType::King {
-                        KingY = i;
-                        KingX = j;
+                        king_y = i;
+                        king_x = j;
                         break 'outer;
                    },
                }
@@ -364,16 +387,16 @@ impl Game {
         }
         // cast a ray from the king in 8 directions 
         let dir: [[isize; 2]; 8] = [[-1, -1], [-1, 0], [0, -1], [0,1], [1, 0], [-1, 1], [1, -1], [1, 1]];
-        let checked: bool = false;
+        let mut checked: bool = false;
         'outer: for i in 1..8 {
-            let curX = KingX;
-            let curY = KingY;
+            let mut cur_x = king_x;
+            let mut cur_y = king_y;
             let DX = dir[i as usize][0 as usize];
             let DY = dir[i as usize][1 as usize];
-            while 0 <= curX+DX && curX+DX < 8 && 0 <= curY+DY && curY+DY < 8 {
-                curX += DX;
-                curY += DY;
-                if self.board[curY][curX] != None && self.board[curY][curX] != self.turn {
+            while 0 <= cur_x+DX && cur_x+DX < 8 && 0 <= cur_y+DY && cur_y+DY < 8 {
+                cur_x += DX;
+                cur_y += DY;
+                if self.board[cur_y as usize][cur_x as usize] != None && self.board[cur_y as usize][cur_x as usize].unwrap().color != self.turn {
                     checked = true;
                     break 'outer;
                 }
@@ -382,12 +405,12 @@ impl Game {
         // check 1 knight move away
         let knight_dir: [[isize; 2]; 8] = [[2, -1], [2, 1], [-2, -1], [-2, 1], [1, 2], [1, -2], [-1, 2], [-1, -2]];
         'outer: for i in 1..8 {
-            let curX = KingX + dir[i as usize][0];
-            let curY = KingY + dir[i as usize][1];
-            if 0 > curX || curX > 8 || 0 > curY || curY > 8 {
+            let cur_x = king_x + knight_dir[i as usize][0];
+            let cur_y = king_y + knight_dir[i as usize][1];
+            if 0 > cur_x || cur_x > 8 || 0 > cur_y || cur_y > 8 {
                 continue;
             }
-            if self.board[curY][curX] != None && self.board[curY][curX].color != self.turn {
+            if self.board[cur_y as usize][cur_x as usize] != None && self.board[cur_y as usize][cur_x as usize].unwrap().color != self.turn {
                 checked = true;
                 break 'outer;
             }
