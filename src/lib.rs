@@ -1,7 +1,7 @@
 use std::result;
 use std::cmp;
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum PieceType {
     Pawn, 
     Knight,
@@ -12,13 +12,13 @@ pub enum PieceType {
 }
 
 
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum Color { 
     Black,
     White,
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Piece {
     piece: PieceType, 
     color: Color, 
@@ -47,7 +47,7 @@ pub struct Move {
 }
 
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub enum MoveType {
     CaptureOrPawn, 
     Other, 
@@ -64,6 +64,7 @@ pub enum MoveError {
     // pinnedPiece,
 }
 
+#[derive(Clone, PartialEq, Debug)]
 pub struct Game {
     board: [[Option<Piece>; 8]; 8],
     turn: Color, 
@@ -91,14 +92,14 @@ impl Game {
                 [None; 8],
                 [Some(Piece{piece: PieceType::Pawn, color: Color::Black}); 8],
                 [
-                    Some(Piece{piece: PieceType::Rook, color: Color::White}),  
-                    Some(Piece{piece: PieceType::Knight, color: Color::White}), 
-                    Some(Piece{piece: PieceType::Bishop, color: Color::White}), 
-                    Some(Piece{piece: PieceType::King, color: Color::White}), 
-                    Some(Piece{piece: PieceType::Queen, color: Color::White}), 
-                    Some(Piece{piece: PieceType::Bishop, color: Color::White}), 
-                    Some(Piece{piece: PieceType::Knight, color: Color::White}), 
-                    Some(Piece{piece: PieceType::Rook, color: Color::White}) 
+                    Some(Piece{piece: PieceType::Rook, color: Color::Black}),  
+                    Some(Piece{piece: PieceType::Knight, color: Color::Black}), 
+                    Some(Piece{piece: PieceType::Bishop, color: Color::Black}), 
+                    Some(Piece{piece: PieceType::King, color: Color::Black}), 
+                    Some(Piece{piece: PieceType::Queen, color: Color::Black}), 
+                    Some(Piece{piece: PieceType::Bishop, color: Color::Black}), 
+                    Some(Piece{piece: PieceType::Knight, color: Color::Black}), 
+                    Some(Piece{piece: PieceType::Rook, color: Color::Black}) 
                 ]]
             }, 
 
@@ -417,11 +418,93 @@ impl Game {
         }
         return checked;
     }
+
+    pub fn game_from_fen(s: &str) -> Game {
+        let mut g = Game::new_game();
+        let mut row: isize = 0;
+        let mut col: isize = 0; 
+        let mut space_found = false;
+        for x in s.chars() {
+            if space_found {
+                match x {
+                    'w' => {
+                        g.turn = Color::White;
+                    }
+                    'b' => {
+                        g.turn = Color::Black;
+                    }
+                    _ => {
+
+                    }
+                }
+                break;
+            }
+            match x {
+                ' ' => {
+                    space_found = true;
+                }
+                '/' => {
+                    row += 1;
+                    col = 0;
+                    continue;
+                }
+                'p' => {
+                    g.board[row as usize][(7-col) as usize] = Some(Piece{piece: PieceType::Pawn, color: Color::White});
+                }
+                'P' => {
+                    g.board[row as usize][(7-col) as usize] = Some(Piece{piece: PieceType::Pawn, color: Color::Black});
+                }
+                'n' => {
+                    g.board[row as usize][(7-col) as usize] = Some(Piece{piece: PieceType::Knight, color: Color::White});
+                }
+                'N' => {
+                    g.board[row as usize][(7-col) as usize] = Some(Piece{piece: PieceType::Knight, color: Color::Black});
+                }
+                'b' => {
+                    g.board[row as usize][(7-col) as usize] = Some(Piece{piece: PieceType::Bishop, color: Color::White});
+                }
+                'B' => {
+                    g.board[row as usize][(7-col) as usize] = Some(Piece{piece: PieceType::Bishop, color: Color::Black});
+                }
+                'r' => {
+                    g.board[row as usize][(7-col) as usize] = Some(Piece{piece: PieceType::Rook, color: Color::White});
+                }
+                'R' => {
+                    g.board[row as usize][(7-col) as usize] = Some(Piece{piece: PieceType::Rook, color: Color::Black});
+                }
+                'q' => {
+                    g.board[row as usize][(7-col) as usize] = Some(Piece{piece: PieceType::Queen, color: Color::White});
+                }
+                'Q' => {
+                    g.board[row as usize][(7-col) as usize] = Some(Piece{piece: PieceType::Queen, color: Color::Black});
+                }
+                'k' => {
+                    g.board[row as usize][(7-col) as usize] = Some(Piece{piece: PieceType::King, color: Color::White});
+                }
+                'K' => {
+                    g.board[row as usize][(7-col) as usize] = Some(Piece{piece: PieceType::King, color: Color::Black});
+                }
+                _ => {
+
+                }
+            }
+            col += 1;
+        }
+        // i guess move history can be ignored for this
+        return g;
+    }
 }
 
 
 #[cfg(test)]
 mod tests {
-    //#[test]
-    
+    use super::*;
+
+    #[test]
+    pub fn check_new_game() {
+        let base_new_game = Game::new_game(); 
+        // let fen_new_game = Game::new_game();
+        let fen_new_game = Game::game_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+        assert_eq!(base_new_game, fen_new_game);
+    }
 }
