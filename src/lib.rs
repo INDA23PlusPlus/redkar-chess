@@ -1,5 +1,6 @@
 use std::result;
-use std::cmp;
+use std::cmp::min;
+use std::cmp::max;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum PieceType {
@@ -24,6 +25,7 @@ pub struct Piece {
     color: Color, 
 }
 
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Decision {
     White,
     Black,
@@ -39,6 +41,7 @@ pub struct MoveType {
 }
 */
 
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Move {
     start_x: usize,
     start_y: usize,
@@ -53,6 +56,7 @@ pub enum MoveType {
     Other, 
 }
 
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum MoveError {
     OutsideBoard,
     WrongColorPiece,
@@ -117,19 +121,22 @@ impl Game {
            // return some error  
         }
         */
+        dbg!(mv);
         let the_piece = match self.board[mv.start_y][mv.start_x] {
             None => return Err(MoveError::NoPiece),
-            Some(p) => if p.color != self.turn {
-                return Err(MoveError::WrongColorPiece)
-            }
-            else {
-                Some(p)
+            Some(p) => {
+                if p.color != self.turn {
+                    return Err(MoveError::WrongColorPiece)
+                }
+                else {
+                    Some(p)
+                }
             },
         };
         
         let mut capture: bool = false;
 
-        let end_square = match self.board[mv.start_y][mv.start_x] {
+        let end_square = match self.board[mv.end_y][mv.end_x] {
             None => Option::<Piece>::None, 
             Some(p) => if p.color == self.turn {
                 return Err(MoveError::FriendlyFire)
@@ -139,6 +146,8 @@ impl Game {
                 Some(p)
             }, 
         };
+        dbg!(the_piece);
+        dbg!(end_square);
 
         match self.legal_movement(&mv, &the_piece, &end_square, capture) { 
             Some(x) => {
@@ -148,21 +157,28 @@ impl Game {
                 // just a normal move
             }
         }
+        dbg!(self.legal_movement(&mv, &the_piece, &end_square, capture));
 
         let saved_start: Option<Piece> = self.board[mv.start_y][mv.start_x].clone();
         let saved_end: Option<Piece> = self.board[mv.end_y][mv.end_x].clone();
 
 
+        dbg!(self.board[mv.start_y][mv.start_x]);
+        dbg!(self.board[mv.end_y][mv.end_x]);
         // potentially temporarily make the move
         self.board[mv.start_y][mv.start_x] = None;
         // BIG Todo! : the_piece is not in scope
         self.board[mv.end_y][mv.end_x] = the_piece;
-
+        
         if self.in_check() { 
+            dbg!("thinks in check");
             self.board[mv.start_y][mv.start_x] = saved_start;
             self.board[mv.end_y][mv.end_x] = saved_end;
             // return some in_check error
         }
+        dbg!("after check check");
+        dbg!(self.board[mv.start_y][mv.start_x]);
+        dbg!(self.board[mv.end_y][mv.end_x]);
 
         // else continue to mate check
         let mut safe_move: bool = false;
@@ -240,7 +256,8 @@ impl Game {
         }
         // check for 50 move draw rule, and force draw like in chess com
         let mut pawn_capture_move: bool = false;
-        for i in (self.move_history.len()-50..self.move_history.len()).rev() {
+        let LEN: isize = self.move_history.len() as isize;
+        for i in (LEN - min(50, LEN)..LEN).rev() {
             if self.move_history[i as usize] == MoveType::CaptureOrPawn {
                 pawn_capture_move = true;
                 break;
@@ -254,6 +271,11 @@ impl Game {
             println!("The game is drawn because 50 reversible moves have been played");
             return Ok(Some(Decision::Tie));
         }
+        // changing turn
+        match self.turn {
+            Color::White => {self.turn = Color::Black;}, 
+            Color::Black => {self.turn = Color::White;}, 
+        }
         return Ok(None);
         // todo! : change stuff about self after a move
     }
@@ -266,10 +288,12 @@ impl Game {
         let board_x = 0..8;
         // if the position doesnt change
         if mv.start_x == mv.end_x && mv.start_y == mv.end_y { 
+            // dbg!("thinks its same");
             return Some(MoveError::Movement);
         }
         // if the moves is in bounds
         if !board_x.contains(&mv.start_x) || !board_x.contains(&mv.end_x) || !board_y.contains(&mv.start_y) || !board_y.contains(&mv.end_y) {
+            // dbg!("thinks its out of bounds");
             return Some(MoveError::OutsideBoard);
         }
         // todo! the_piece and end_square are of type Option<Piece>
@@ -288,22 +312,30 @@ impl Game {
             /* check if move is even legal */
             // check if it right type of move 
             PieceType::Pawn => {
+                // dbg!("thinks its pawn");
                 if (mv.end_x as isize - mv.start_x as isize).abs() != { if capture {1} else {0} } {
+                    // dbg!("thinks pawn is not moving to the side");
                     return Some(MoveError::Movement);
                 }
                 let y_dif = mv.end_y as isize - mv.start_y as isize;
-                if mv.start_y == 0 || mv.start_y == 7 {
-                    if y_dif > { if self.turn == Color::White {2} else {-2} } {
+                dbg!(y_dif);
+                // todo! : make sure the pawn doesnt move back
+                if mv.start_y == 1 || mv.start_y == 6 {
+                    if (y_dif > 2 && self.turn == Color::White) || (y_dif < -2 && self.turn == Color::Black) {
+                        // dbg!("thinks its moving more than 2 steps in y");
                         return Some(MoveError::Movement);
                     }
                 }
                 else {
-                    if y_dif > { if self.turn == Color::White {1} else {-1} } {
+                    // todo make the rest of the movement statements like this vvv
+                    if (y_dif > 1 && self.turn == Color::White) || (y_dif < -1 && self.turn == Color::Black) {
+                        // dbg!("thinks its moving more than 1 steps in y");
                         return Some(MoveError::Movement);
                     }
                 }
             }
             PieceType::Knight => {
+
                 // should always have legal Movement at this stage
             }
             PieceType::Bishop => {
@@ -344,7 +376,7 @@ impl Game {
             PieceType::Queen => {
                 let Y = (mv.end_y as isize - mv.start_y as isize).abs();
                 let X = (mv.end_x as isize - mv.start_x as isize).abs();
-                if cmp::max(X, Y) != cmp::min(X, Y) && cmp::min(X, Y) != 0 {
+                if max(X, Y) != min(X, Y) && min(X, Y) != 0 {
                     return Some(MoveError::Movement);
                 }
                 let mut cur_x = mv.start_x;
@@ -372,20 +404,23 @@ impl Game {
         /* FOR checking if a move is legal */ 
         // make a copy of the board 
         // find king
+        dbg!(self.turn);
         let mut king_x: isize = 0;
         let mut king_y: isize = 0;
-        'outer: for i in 1..8 {
-            for j in 1..8 {
-               match self.board[i as usize][j as usize] {
-                   None => continue,
-                   Some(p) => if p.color == self.turn && p.piece == PieceType::King {
+        'outer: for i in 0..8 {
+            for j in 0..8 {
+                match self.board[i as usize][j as usize] {
+                    None => continue,
+                    Some(p) => if p.color == self.turn && p.piece == PieceType::King {
                         king_y = i;
                         king_x = j;
                         break 'outer;
-                   },
-               }
+                    },
+                }
             }
         }
+        dbg!(king_x);
+        dbg!(king_y);
         // cast a ray from the king in 8 directions 
         let dir: [[isize; 2]; 8] = [[-1, -1], [-1, 0], [0, -1], [0,1], [1, 0], [-1, 1], [1, -1], [1, 1]];
         let mut checked: bool = false;
@@ -397,9 +432,40 @@ impl Game {
             while 0 <= cur_x+DX && cur_x+DX < 8 && 0 <= cur_y+DY && cur_y+DY < 8 {
                 cur_x += DX;
                 cur_y += DY;
-                if self.board[cur_y as usize][cur_x as usize] != None && self.board[cur_y as usize][cur_x as usize].unwrap().color != self.turn {
-                    checked = true;
-                    break 'outer;
+                match self.board[cur_y as usize][cur_x as usize] {
+                    Some(p) => if p.color != self.turn {
+                        match p.piece {
+                            PieceType::Rook => if min(DX.abs(), DY.abs()) == 0 {
+                                checked = true;
+                                break;
+                            },
+                            PieceType::Bishop => if min(DX.abs(), DY.abs()) != 0 {
+                                checked = true;
+                                break;
+                            },
+                            PieceType::Queen => {
+                                checked = true;
+                                break;
+                            },
+                            PieceType::Pawn => {
+                                match self.turn {
+                                    Color::White => if (cur_x - king_x).abs() == 1 && cur_y - king_y == 1 {
+                                        checked = true;
+                                        break;
+                                    }
+                                    Color::Black => if (cur_x - king_x).abs() == 1 && cur_y - king_y == -1 {
+                                        checked = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            PieceType::King => if max((cur_x-king_x), (cur_y-king_y)) == 1 {
+                                checked = true;
+                            },
+                            _ => {},
+                        }
+                    },
+                    None => {},
                 }
             }
         }
@@ -421,8 +487,8 @@ impl Game {
 
     pub fn game_from_fen(s: &str) -> Game {
         let mut g = Game::new_game();
-        let mut row: isize = 0;
-        let mut col: isize = 0; 
+        let mut row: isize = 7;
+        let mut col: isize = 7; 
         let mut space_found = false;
         for x in s.chars() {
             if space_found {
@@ -444,53 +510,76 @@ impl Game {
                     space_found = true;
                 }
                 '/' => {
-                    row += 1;
-                    col = 0;
+                    row -= 1;
+                    col = 7;
                     continue;
                 }
-                'p' => {
-                    g.board[row as usize][(7-col) as usize] = Some(Piece{piece: PieceType::Pawn, color: Color::White});
-                }
                 'P' => {
-                    g.board[row as usize][(7-col) as usize] = Some(Piece{piece: PieceType::Pawn, color: Color::Black});
+                    g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::Pawn, color: Color::White});
                 }
-                'n' => {
-                    g.board[row as usize][(7-col) as usize] = Some(Piece{piece: PieceType::Knight, color: Color::White});
+                'p' => {
+                    g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::Pawn, color: Color::Black});
                 }
                 'N' => {
-                    g.board[row as usize][(7-col) as usize] = Some(Piece{piece: PieceType::Knight, color: Color::Black});
+                    g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::Knight, color: Color::White});
                 }
-                'b' => {
-                    g.board[row as usize][(7-col) as usize] = Some(Piece{piece: PieceType::Bishop, color: Color::White});
+                'n' => {
+                    g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::Knight, color: Color::Black});
                 }
                 'B' => {
-                    g.board[row as usize][(7-col) as usize] = Some(Piece{piece: PieceType::Bishop, color: Color::Black});
+                    g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::Bishop, color: Color::White});
                 }
-                'r' => {
-                    g.board[row as usize][(7-col) as usize] = Some(Piece{piece: PieceType::Rook, color: Color::White});
+                'b' => {
+                    g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::Bishop, color: Color::Black});
                 }
                 'R' => {
-                    g.board[row as usize][(7-col) as usize] = Some(Piece{piece: PieceType::Rook, color: Color::Black});
+                    g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::Rook, color: Color::White});
                 }
-                'q' => {
-                    g.board[row as usize][(7-col) as usize] = Some(Piece{piece: PieceType::Queen, color: Color::White});
+                'r' => {
+                    g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::Rook, color: Color::Black});
                 }
                 'Q' => {
-                    g.board[row as usize][(7-col) as usize] = Some(Piece{piece: PieceType::Queen, color: Color::Black});
+                    g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::Queen, color: Color::White});
                 }
-                'k' => {
-                    g.board[row as usize][(7-col) as usize] = Some(Piece{piece: PieceType::King, color: Color::White});
+                'q' => {
+                    g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::Queen, color: Color::Black});
                 }
                 'K' => {
-                    g.board[row as usize][(7-col) as usize] = Some(Piece{piece: PieceType::King, color: Color::Black});
+                    g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::King, color: Color::White});
                 }
-                _ => {
-
+                'k' => {
+                    g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::King, color: Color::Black});
                 }
+                '1' => {
+                    col -= 1;
+                }
+                '2' => {
+                    col -= 2;
+                }
+                '3' => {
+                    col -= 3;
+                }
+                '4' => {
+                    col -= 4;
+                }
+                '5' => {
+                    col -= 5;
+                }
+                '6' => {
+                    col -= 6;
+                }
+                '7' => {
+                    col -= 7;
+                }
+                '8' => {
+                    col -= 8;
+                }
+                _ => {}
             }
-            col += 1;
+            col -= 1;
         }
         // i guess move history can be ignored for this
+        dbg!(g.clone());
         return g;
     }
 }
@@ -503,16 +592,28 @@ mod tests {
     #[test]
     pub fn check_new_game() {
         let base_new_game = Game::new_game(); 
-        // let fen_new_game = Game::new_game();
-        let fen_new_game = Game::game_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
-        assert_eq!(base_new_game, fen_new_game);
+        let fen_game = Game::game_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+        assert_eq!(base_new_game, fen_game);
+    }
+
+    pub fn check_new_game_wrong() {
+        let base_new_game = Game::new_game(); 
+        let fen_game = Game::game_from_fen("Rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+        assert_eq!(base_new_game, fen_game);
     }
 
     #[test]
-    pub fn check_new_game_wrong() {
-        let base_new_game = Game::new_game(); 
-        // let fen_new_game = Game::new_game();
-        let fen_new_game = Game::game_from_fen("Rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
-        assert_eq!(base_new_game, fen_new_game);
+    pub fn pawn_move() {
+        let mut pawn_move = Game::new_game();
+        pawn_move.do_move(Move{start_x: 3, start_y: 1, end_x: 3, end_y: 3});
+        let fen_game = Game::game_from_fen("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1");
+        assert_eq!(pawn_move.board, fen_game.board);
+    }
+    
+    pub fn doesnt_move() {
+        let mut pawn_move = Game::new_game();
+        pawn_move.do_move(Move{start_x: 3, start_y: 1, end_x: 3, end_y: 3});
+        let base_game = Game::game_from_fen("Rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+        assert_eq!(pawn_move, base_game);
     }
 }
