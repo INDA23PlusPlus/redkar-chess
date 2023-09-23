@@ -111,6 +111,15 @@ impl Game {
             move_history: Vec::new(),
         }
     }
+    pub fn empty_game() -> Game {
+        Game {
+            board: {
+                [[None; 8]; 8]
+            },
+            turn: Color::White,
+            move_history: Vec::new(),
+        }
+    }
     /* should perform a move if possible */
     pub fn do_move(&mut self, mv: Move) -> result::Result<Option<Decision>, MoveError> {
 
@@ -174,6 +183,7 @@ impl Game {
             dbg!("thinks in check");
             self.board[mv.start_y][mv.start_x] = saved_start;
             self.board[mv.end_y][mv.end_x] = saved_end;
+            return Err(MoveError::SelfCheck);
             // return some in_check error
         }
         dbg!("after check check");
@@ -185,10 +195,10 @@ impl Game {
 
         // i'm sure there is a better way or writing this mate check. The complexity is through the
         // roof here.
-        'move_gen: for org_y in 1..8 {
-            for org_x in 1..8 {
-                for dest_y in 1..8 {
-                    for dest_x in 1..8 {
+        'move_gen: for org_y in 0..8 {
+            for org_x in 0..8 {
+                for dest_y in 0..8 {
+                    for dest_x in 0..8 {
                         let cur_move: Move = Move{start_x: org_x, start_y: org_y, end_x: dest_x, end_y: dest_y};
                         let cur_piece = match self.board[org_y][org_x] {
                             None => continue,
@@ -221,6 +231,7 @@ impl Game {
                 }
             }
         }
+        dbg!(safe_move);
         if !safe_move {
             // self.turn has won
             // signal end of game or something
@@ -424,7 +435,7 @@ impl Game {
         // cast a ray from the king in 8 directions 
         let dir: [[isize; 2]; 8] = [[-1, -1], [-1, 0], [0, -1], [0,1], [1, 0], [-1, 1], [1, -1], [1, 1]];
         let mut checked: bool = false;
-        'outer: for i in 1..8 {
+        'outer: for i in 0..8 {
             let mut cur_x = king_x;
             let mut cur_y = king_y;
             let DX = dir[i as usize][0 as usize];
@@ -432,51 +443,71 @@ impl Game {
             while 0 <= cur_x+DX && cur_x+DX < 8 && 0 <= cur_y+DY && cur_y+DY < 8 {
                 cur_x += DX;
                 cur_y += DY;
+                dbg!(cur_x);
+                dbg!(cur_y);
+                dbg!(self.board[cur_y as usize][cur_x as usize]);
                 match self.board[cur_y as usize][cur_x as usize] {
                     Some(p) => if p.color != self.turn {
                         match p.piece {
                             PieceType::Rook => if min(DX.abs(), DY.abs()) == 0 {
+                                dbg!(p.piece);
                                 checked = true;
                                 break;
                             },
                             PieceType::Bishop => if min(DX.abs(), DY.abs()) != 0 {
+                                dbg!(p.piece);
                                 checked = true;
                                 break;
                             },
                             PieceType::Queen => {
+                                dbg!(p.piece);
                                 checked = true;
                                 break;
                             },
                             PieceType::Pawn => {
                                 match self.turn {
                                     Color::White => if (cur_x - king_x).abs() == 1 && cur_y - king_y == 1 {
+                                        dbg!(p.piece);
                                         checked = true;
                                         break;
                                     }
                                     Color::Black => if (cur_x - king_x).abs() == 1 && cur_y - king_y == -1 {
+                                        dbg!(p.piece);
                                         checked = true;
                                         break;
                                     }
                                 }
                             }
-                            PieceType::King => if max((cur_x-king_x), (cur_y-king_y)) == 1 {
+                            PieceType::King => if max((cur_x-king_x).abs(), (cur_y-king_y).abs()) == 1 {
                                 checked = true;
                             },
                             _ => {},
                         }
+                    }
+                    else {
+                        dbg!("IN");
+                        dbg!(p.piece);
+                        break;
                     },
                     None => {},
                 }
             }
+            dbg!(checked);
+            dbg!(DX);
+            dbg!(DY);
         }
+        dbg!("Hello"); 
+        dbg!(checked);
         // check 1 knight move away
         let knight_dir: [[isize; 2]; 8] = [[2, -1], [2, 1], [-2, -1], [-2, 1], [1, 2], [1, -2], [-1, 2], [-1, -2]];
-        'outer: for i in 1..8 {
+        'outer: for i in 0..8 {
             let cur_x = king_x + knight_dir[i as usize][0];
             let cur_y = king_y + knight_dir[i as usize][1];
-            if 0 > cur_x || cur_x > 8 || 0 > cur_y || cur_y > 8 {
+            if 0 > cur_x || cur_x > 7 || 0 > cur_y || cur_y > 7 {
                 continue;
             }
+            dbg!(cur_y);
+            dbg!(cur_x);
             if self.board[cur_y as usize][cur_x as usize] != None && self.board[cur_y as usize][cur_x as usize].unwrap().color != self.turn {
                 checked = true;
                 break 'outer;
@@ -486,11 +517,13 @@ impl Game {
     }
 
     pub fn game_from_fen(s: &str) -> Game {
-        let mut g = Game::new_game();
+        let mut g = Game::empty_game();
         let mut row: isize = 7;
         let mut col: isize = 7; 
         let mut space_found = false;
         for x in s.chars() {
+            dbg!(row);
+            dbg!(col);
             if space_found {
                 match x {
                     'w' => {
@@ -507,79 +540,101 @@ impl Game {
             }
             match x {
                 ' ' => {
+                    dbg!(1);
                     space_found = true;
                 }
                 '/' => {
+                    dbg!(2);
                     row -= 1;
                     col = 7;
                     continue;
                 }
                 'P' => {
+                    dbg!(3);
                     g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::Pawn, color: Color::White});
                 }
                 'p' => {
+                    dbg!(4);
                     g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::Pawn, color: Color::Black});
                 }
                 'N' => {
+                    dbg!(5);
                     g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::Knight, color: Color::White});
                 }
                 'n' => {
+                    dbg!(6);
                     g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::Knight, color: Color::Black});
                 }
                 'B' => {
+                    dbg!(7);
                     g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::Bishop, color: Color::White});
                 }
                 'b' => {
+                    dbg!(8);
                     g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::Bishop, color: Color::Black});
                 }
                 'R' => {
+                    dbg!(9);
                     g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::Rook, color: Color::White});
                 }
                 'r' => {
+                    dbg!(1);
                     g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::Rook, color: Color::Black});
                 }
                 'Q' => {
+                    dbg!(12);
                     g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::Queen, color: Color::White});
                 }
                 'q' => {
+                    dbg!(13);
                     g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::Queen, color: Color::Black});
                 }
                 'K' => {
+                    dbg!(14);
                     g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::King, color: Color::White});
                 }
                 'k' => {
+                    dbg!(15);
                     g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::King, color: Color::Black});
                 }
                 '1' => {
                     col -= 1;
+                    continue;
                 }
                 '2' => {
                     col -= 2;
+                    continue;
                 }
                 '3' => {
                     col -= 3;
+                    continue;
                 }
                 '4' => {
                     col -= 4;
+                    continue;
                 }
                 '5' => {
                     col -= 5;
+                    continue;
                 }
                 '6' => {
                     col -= 6;
+                    continue;
                 }
                 '7' => {
                     col -= 7;
+                    continue;
                 }
                 '8' => {
                     col -= 8;
+                    continue;
+
                 }
                 _ => {}
             }
             col -= 1;
         }
         // i guess move history can be ignored for this
-        dbg!(g.clone());
         return g;
     }
 }
@@ -610,10 +665,48 @@ mod tests {
         assert_eq!(pawn_move.board, fen_game.board);
     }
     
+    // #[test]
     pub fn doesnt_move() {
         let mut pawn_move = Game::new_game();
         pawn_move.do_move(Move{start_x: 3, start_y: 1, end_x: 3, end_y: 3});
         let base_game = Game::game_from_fen("Rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
-        assert_eq!(pawn_move, base_game);
+        assert_eq!(pawn_move.board, base_game.board);
+    }
+
+    #[test]
+    pub fn knight_move() {
+        let mut knight_move = Game::new_game();
+        knight_move.do_move(Move { start_x: 1, start_y: 0, end_x: 2, end_y: 2});
+        let fen_game = Game::game_from_fen("rnbqkbnr/pppppppp/8/8/8/5N2/PPPPPPPP/RNBQKB1R b KQkq - 1 1");
+        assert_eq!(knight_move.board, fen_game.board);
+    }
+
+    #[test]
+    pub fn italian_game() {
+        let mut italian_game = Game::new_game();
+        italian_game.do_move(Move{start_x: 3, start_y: 1, end_x: 3, end_y: 3});
+        italian_game.do_move(Move { start_x: 3, start_y: 6, end_x: 3, end_y: 4});
+        italian_game.do_move(Move{start_x: 1, start_y: 0, end_x: 2, end_y: 2});
+        italian_game.do_move(Move{start_x: 6, start_y: 7, end_x: 5, end_y: 5});
+        italian_game.do_move(Move{start_x: 2, start_y: 0, end_x: 5, end_y: 3});
+        // let fen_game = Game::game_from_fen("r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3");
+        let fen_game = Game::game_from_fen("r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3");
+        assert_eq!(italian_game.board, fen_game.board);
+    }
+
+    #[test]
+    pub fn pin_ruy_lopez() {
+        let mut pin_ruy_lopez = Game::new_game();
+        pin_ruy_lopez.do_move(Move{start_x: 3, start_y: 1, end_x: 3, end_y: 3});
+        pin_ruy_lopez.do_move(Move { start_x: 3, start_y: 6, end_x: 3, end_y: 4});
+        pin_ruy_lopez.do_move(Move{start_x: 1, start_y: 0, end_x: 2, end_y: 2});
+        pin_ruy_lopez.do_move(Move{start_x: 6, start_y: 7, end_x: 5, end_y: 5});
+        pin_ruy_lopez.do_move(Move{start_x: 2, start_y: 0, end_x: 6, end_y: 4});
+        pin_ruy_lopez.do_move(Move{start_x: 4, start_y: 6, end_x: 4, end_y: 5});
+        pin_ruy_lopez.do_move(Move{start_x: 6, start_y: 0, end_x: 5, end_y: 2});
+        pin_ruy_lopez.do_move(Move{start_x: 5, start_y: 5, end_x: 4, end_y: 3});
+        pin_ruy_lopez.do_move(Move{start_x: 7, start_y: 6, end_x: 7, end_y: 5});
+        let fen_game = Game::game_from_fen("r1bqkbnr/1pp2ppp/p1np4/1B2p3/4P3/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 0 5");
+        assert_eq!(pin_ruy_lopez.board, fen_game.board);
     }
 }
