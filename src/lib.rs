@@ -65,6 +65,7 @@ pub enum MoveError {
     BlockedPath,
     SelfCheck,
     Movement,
+    Mated,
     // pinnedPiece,
 }
 
@@ -72,6 +73,7 @@ pub enum MoveError {
 pub struct Game {
     board: [[Option<Piece>; 8]; 8],
     turn: Color, 
+    checkmated: bool, 
     move_history: Vec<MoveType>, /* will be needed to check whether draw can be claimed */
 }
 
@@ -109,6 +111,7 @@ impl Game {
 
             turn: Color::White,
             move_history: Vec::new(),
+            checkmated: false,
         }
     }
     pub fn empty_game() -> Game {
@@ -117,6 +120,7 @@ impl Game {
                 [[None; 8]; 8]
             },
             turn: Color::White,
+            checkmated: false,
             move_history: Vec::new(),
         }
     }
@@ -130,6 +134,9 @@ impl Game {
            // return some error  
         }
         */
+        if self.checkmated {
+            return Err(MoveError::Mated);
+        }
         dbg!(mv);
         let the_piece = match self.board[mv.start_y][mv.start_x] {
             None => return Err(MoveError::NoPiece),
@@ -176,7 +183,6 @@ impl Game {
         dbg!(self.board[mv.end_y][mv.end_x]);
         // potentially temporarily make the move
         self.board[mv.start_y][mv.start_x] = None;
-        // BIG Todo! : the_piece is not in scope
         self.board[mv.end_y][mv.end_x] = the_piece;
         
         if self.in_check() { 
@@ -195,6 +201,12 @@ impl Game {
 
         // i'm sure there is a better way or writing this mate check. The complexity is through the
         // roof here.
+        // temporarily change color 
+        dbg!(self.turn);
+        match self.turn {
+            Color::White => self.turn = Color::Black,
+            Color::Black => self.turn = Color::White,
+        }
         'move_gen: for org_y in 0..8 {
             for org_x in 0..8 {
                 for dest_y in 0..8 {
@@ -224,17 +236,31 @@ impl Game {
                         };
 
                         if self.legal_movement(&cur_move, &cur_piece, &cur_end_square, cur_capture).is_none() {
-                            safe_move = true;
+                            let saved_start: Option<Piece> = self.board[cur_move.start_y][cur_move.start_x].clone();
+                            let saved_end: Option<Piece> = self.board[cur_move.end_y][cur_move.end_x].clone();
+                            self.board[cur_move.start_y][cur_move.start_x] = None; 
+                            self.board[cur_move.end_y][cur_move.end_x] = saved_start.clone(); 
+                            if !self.in_check() {
+                                safe_move = true; 
+                            }
+                            self.board[cur_move.start_y][cur_move.start_x] = saved_start; 
+                            self.board[cur_move.end_y][cur_move.end_x] = saved_end; 
                             break 'move_gen;
                         }
                     }
                 }
             }
         }
+        // switch color back
+        match self.turn {
+            Color::White => self.turn = Color::Black,
+            Color::Black => self.turn = Color::White,
+        }
         dbg!(safe_move);
         if !safe_move {
             // self.turn has won
             // signal end of game or something
+            dbg!("got here");
             let winner = match self.turn {
                 Color::White => "White",
                 Color::Black => "Black",
@@ -274,7 +300,6 @@ impl Game {
                 break;
             }
         }
-        // todo! check all let matches for semicolon
         if !pawn_capture_move {
             // the game is drawn
             // end game or something
@@ -288,13 +313,11 @@ impl Game {
             Color::Black => {self.turn = Color::White;}, 
         }
         return Ok(None);
-        // todo! : change stuff about self after a move
     }
 
     // checks for move legality
     pub fn legal_movement(&mut self, mv: &Move, the_piece: &Option<Piece>, end_square: &Option<Piece>, capture: bool) -> Option<MoveError> {
         /* check possible mv errors in order */
-        //todo! come back here
         let board_y = 0..8;
         let board_x = 0..8;
         // if the position doesnt change
@@ -307,7 +330,6 @@ impl Game {
             // dbg!("thinks its out of bounds");
             return Some(MoveError::OutsideBoard);
         }
-        // todo! the_piece and end_square are of type Option<Piece>
         let dx: isize = { 
             if (mv.end_x as isize) - (mv.start_x as isize) > 0 {1}
             else if (mv.end_x as isize) - (mv.start_x as isize) < 0 {-1}
@@ -332,14 +354,14 @@ impl Game {
                 dbg!(y_dif);
                 // todo! : make sure the pawn doesnt move back
                 if mv.start_y == 1 || mv.start_y == 6 {
-                    if (y_dif > 2 && self.turn == Color::White) || (y_dif < -2 && self.turn == Color::Black) {
+                    if ((y_dif > 2 || y_dif < 1) && self.turn == Color::White) || ((y_dif < -2 || y_dif > -1) && self.turn == Color::Black) {
                         // dbg!("thinks its moving more than 2 steps in y");
                         return Some(MoveError::Movement);
                     }
                 }
                 else {
                     // todo make the rest of the movement statements like this vvv
-                    if (y_dif > 1 && self.turn == Color::White) || (y_dif < -1 && self.turn == Color::Black) {
+                    if (y_dif != 1 && self.turn == Color::White) || (y_dif != -1 && self.turn == Color::Black) {
                         // dbg!("thinks its moving more than 1 steps in y");
                         return Some(MoveError::Movement);
                     }
@@ -354,16 +376,16 @@ impl Game {
                     return Some(MoveError::Movement);
                 }
 
-                let mut cur_x = mv.start_x;
-                let mut cur_y = mv.start_y;
-                while (cur_x != mv.end_x) || (cur_y != mv.end_y) {
-                    if  (cur_x != mv.start_x) || (cur_y != mv.start_y) {
-                        if self.board[cur_y][cur_x].is_some() {
+                let mut cur_x: isize =  mv.start_x as isize;
+                let mut cur_y: isize = mv.start_y as isize;
+                while (cur_x != mv.end_x as isize) || (cur_y != mv.end_y as isize) {
+                    if  (cur_x != mv.start_x as isize) || (cur_y != mv.start_y as isize) {
+                        if self.board[cur_y as usize][cur_x as usize].is_some() {
                             return Some(MoveError::BlockedPath);
                         }
                     }
-                    cur_x += dx as usize;
-                    cur_y += dy as usize;
+                    cur_x += dx as isize;
+                    cur_y += dy as isize;
                 }
 
             }
@@ -372,16 +394,16 @@ impl Game {
                     return Some(MoveError::Movement);
                 }
 
-                let mut cur_x = mv.start_x;
-                let mut cur_y = mv.start_y;
-                while (cur_x != mv.end_x) || (cur_y != mv.end_y) {
-                    if  (cur_x != mv.start_x) || (cur_y != mv.start_y) {
-                        if self.board[cur_y][cur_x].is_some() {
+                let mut cur_x: isize = mv.start_x as isize;
+                let mut cur_y: isize = mv.start_y as isize;
+                while (cur_x != mv.end_x as isize) || (cur_y != mv.end_y as isize) {
+                    if  (cur_x != mv.start_x as isize) || (cur_y != mv.start_y as isize) {
+                        if self.board[cur_y as usize][cur_x as usize].is_some() {
                             return Some(MoveError::BlockedPath);
                         }
                     }
-                    cur_x += dx as usize;
-                    cur_y += dy as usize;
+                    cur_x += dx as isize;
+                    cur_y += dy as isize;
                 }
             }
             PieceType::Queen => {
@@ -390,16 +412,16 @@ impl Game {
                 if max(X, Y) != min(X, Y) && min(X, Y) != 0 {
                     return Some(MoveError::Movement);
                 }
-                let mut cur_x = mv.start_x;
-                let mut cur_y = mv.start_y;
-                while (cur_x != mv.end_x) || (cur_y != mv.end_y) {
-                    if  (cur_x != mv.start_x) || (cur_y != mv.start_y) {
-                        if self.board[cur_y][cur_x].is_some() {
+                let mut cur_x = mv.start_x as isize;
+                let mut cur_y = mv.start_y as isize;
+                while (cur_x != mv.end_x as isize) || (cur_y != mv.end_y as isize) {
+                    if  (cur_x != mv.start_x as isize) || (cur_y != mv.start_y as isize) {
+                        if self.board[cur_y as usize][cur_x as usize].is_some() {
                             return Some(MoveError::BlockedPath);
                         }
                     }
-                    cur_x += dx as usize;
-                    cur_y += dy as usize;
+                    cur_x += dx as isize;
+                    cur_y += dy as isize;
                 }
             }
             PieceType::King => {
@@ -415,7 +437,6 @@ impl Game {
         /* FOR checking if a move is legal */ 
         // make a copy of the board 
         // find king
-        dbg!(self.turn);
         let mut king_x: isize = 0;
         let mut king_y: isize = 0;
         'outer: for i in 0..8 {
@@ -430,8 +451,6 @@ impl Game {
                 }
             }
         }
-        dbg!(king_x);
-        dbg!(king_y);
         // cast a ray from the king in 8 directions 
         let dir: [[isize; 2]; 8] = [[-1, -1], [-1, 0], [0, -1], [0,1], [1, 0], [-1, 1], [1, -1], [1, 1]];
         let mut checked: bool = false;
@@ -443,9 +462,6 @@ impl Game {
             while 0 <= cur_x+DX && cur_x+DX < 8 && 0 <= cur_y+DY && cur_y+DY < 8 {
                 cur_x += DX;
                 cur_y += DY;
-                dbg!(cur_x);
-                dbg!(cur_y);
-                dbg!(self.board[cur_y as usize][cur_x as usize]);
                 match self.board[cur_y as usize][cur_x as usize] {
                     Some(p) => if p.color != self.turn {
                         match p.piece {
@@ -485,19 +501,12 @@ impl Game {
                         }
                     }
                     else {
-                        dbg!("IN");
-                        dbg!(p.piece);
                         break;
                     },
                     None => {},
                 }
             }
-            dbg!(checked);
-            dbg!(DX);
-            dbg!(DY);
         }
-        dbg!("Hello"); 
-        dbg!(checked);
         // check 1 knight move away
         let knight_dir: [[isize; 2]; 8] = [[2, -1], [2, 1], [-2, -1], [-2, 1], [1, 2], [1, -2], [-1, 2], [-1, -2]];
         'outer: for i in 0..8 {
@@ -506,8 +515,6 @@ impl Game {
             if 0 > cur_x || cur_x > 7 || 0 > cur_y || cur_y > 7 {
                 continue;
             }
-            dbg!(cur_y);
-            dbg!(cur_x);
             if self.board[cur_y as usize][cur_x as usize] != None && self.board[cur_y as usize][cur_x as usize].unwrap().color != self.turn {
                 checked = true;
                 break 'outer;
@@ -522,8 +529,6 @@ impl Game {
         let mut col: isize = 7; 
         let mut space_found = false;
         for x in s.chars() {
-            dbg!(row);
-            dbg!(col);
             if space_found {
                 match x {
                     'w' => {
@@ -540,61 +545,61 @@ impl Game {
             }
             match x {
                 ' ' => {
-                    dbg!(1);
+                    // dbg!(1);
                     space_found = true;
                 }
                 '/' => {
-                    dbg!(2);
+                    // dbg!(2);
                     row -= 1;
                     col = 7;
                     continue;
                 }
                 'P' => {
-                    dbg!(3);
+                    // dbg!(3);
                     g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::Pawn, color: Color::White});
                 }
                 'p' => {
-                    dbg!(4);
+                    // dbg!(4);
                     g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::Pawn, color: Color::Black});
                 }
                 'N' => {
-                    dbg!(5);
+                    // dbg!(5);
                     g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::Knight, color: Color::White});
                 }
                 'n' => {
-                    dbg!(6);
+                    // dbg!(6);
                     g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::Knight, color: Color::Black});
                 }
                 'B' => {
-                    dbg!(7);
+                    // dbg!(7);
                     g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::Bishop, color: Color::White});
                 }
                 'b' => {
-                    dbg!(8);
+                    // dbg!(8);
                     g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::Bishop, color: Color::Black});
                 }
                 'R' => {
-                    dbg!(9);
+                    // dbg!(9);
                     g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::Rook, color: Color::White});
                 }
                 'r' => {
-                    dbg!(1);
+                    // dbg!(1);
                     g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::Rook, color: Color::Black});
                 }
                 'Q' => {
-                    dbg!(12);
+                    // dbg!(12);
                     g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::Queen, color: Color::White});
                 }
                 'q' => {
-                    dbg!(13);
+                    // dbg!(13);
                     g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::Queen, color: Color::Black});
                 }
                 'K' => {
-                    dbg!(14);
+                    // dbg!(14);
                     g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::King, color: Color::White});
                 }
                 'k' => {
-                    dbg!(15);
+                    // dbg!(15);
                     g.board[row as usize][col as usize] = Some(Piece{piece: PieceType::King, color: Color::Black});
                 }
                 '1' => {
@@ -708,5 +713,30 @@ mod tests {
         pin_ruy_lopez.do_move(Move{start_x: 7, start_y: 6, end_x: 7, end_y: 5});
         let fen_game = Game::game_from_fen("r1bqkbnr/1pp2ppp/p1np4/1B2p3/4P3/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 0 5");
         assert_eq!(pin_ruy_lopez.board, fen_game.board);
+    }
+    #[test]
+    pub fn fools_mate() {
+        let mut fools_mate = Game::new_game();
+        fools_mate.do_move(Move{start_x: 3, start_y: 1, end_x: 3, end_y: 3});
+        fools_mate.do_move(Move{start_x: 1, start_y: 6, end_x: 1, end_y: 4});
+        fools_mate.do_move(Move{start_x: 4, start_y: 1, end_x: 4, end_y: 3});
+        fools_mate.do_move(Move{start_x: 2, start_y: 6, end_x: 2, end_y: 5});
+        fools_mate.do_move(Move{start_x: 4, start_y: 0, end_x: 0, end_y: 4});
+        let fen_game = Game::game_from_fen("rnbqkbnr/ppppp2p/5p2/6pQ/3PP3/8/PPP2PPP/RNB1KBNR b KQkq - 1 3");
+        assert_eq!(fools_mate.board, fen_game.board);
+    }
+    
+    #[test]
+    pub fn move_after_mate() {
+        let mut move_after_mate = Game::new_game();
+        move_after_mate.do_move(Move{start_x: 3, start_y: 1, end_x: 3, end_y: 3});
+        move_after_mate.do_move(Move{start_x: 1, start_y: 6, end_x: 1, end_y: 4});
+        move_after_mate.do_move(Move{start_x: 4, start_y: 1, end_x: 4, end_y: 3});
+        move_after_mate.do_move(Move{start_x: 2, start_y: 6, end_x: 2, end_y: 5});
+        move_after_mate.do_move(Move{start_x: 4, start_y: 0, end_x: 0, end_y: 4});
+        move_after_mate.do_move(Move{start_x: 4, start_y: 0, end_x: 0, end_y: 4});
+        move_after_mate.do_move(Move{start_x: 4, start_y: 0, end_x: 0, end_y: 4});
+        let fen_game = Game::game_from_fen("rnbqkbnr/ppppp2p/5p2/6pQ/3PP3/8/PPP2PPP/RNB1KBNR b KQkq - 1 3");
+        assert_eq!(move_after_mate.board, fen_game.board);
     }
 }
