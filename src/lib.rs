@@ -73,7 +73,7 @@ pub enum MoveError {
 pub struct Game {
     board: [[Option<Piece>; 8]; 8],
     turn: Color, 
-    checkmated: bool, 
+    finished: bool, 
     move_history: Vec<MoveType>, /* will be needed to check whether draw can be claimed */
 }
 
@@ -111,7 +111,7 @@ impl Game {
 
             turn: Color::White,
             move_history: Vec::new(),
-            checkmated: false,
+            finished: false,
         }
     }
     pub fn empty_game() -> Game {
@@ -120,7 +120,7 @@ impl Game {
                 [[None; 8]; 8]
             },
             turn: Color::White,
-            checkmated: false,
+            finished: false,
             move_history: Vec::new(),
         }
     }
@@ -134,7 +134,7 @@ impl Game {
            // return some error  
         }
         */
-        if self.checkmated {
+        if self.finished {
             return Err(MoveError::Mated);
         }
         dbg!(mv);
@@ -305,6 +305,7 @@ impl Game {
             // end game or something
             // dont know println is the best way to handle this
             println!("The game is drawn because 50 reversible moves have been played");
+            self.finished = true;
             return Ok(Some(Decision::Tie));
         }
         // changing turn
