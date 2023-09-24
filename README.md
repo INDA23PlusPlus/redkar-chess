@@ -29,11 +29,12 @@ pub struct Move {
     end_x: usize,
     end_y: usize,
 }
+```
 
 The chessboard coordinates are 0-indexed and are as so: 
 Files: a-h = 7, 6, ... 0 
 Ranks: 1-8 = 0, 1, ... 7
-```
+
 The function do\_move will perform the move if possible and return either a Err(MoveError), or an Ok(Option\<Decision\>);
 If Option\<Decision\> is Some(Decision), then the game has ended, and the decision will be given:
 ```rust
