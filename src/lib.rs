@@ -71,8 +71,8 @@ pub enum MoveError {
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Game {
-    board: [[Option<Piece>; 8]; 8],
-    turn: Color, 
+    pub board: [[Option<Piece>; 8]; 8],
+    pub turn: Color, 
     finished: bool, 
     move_history: Vec<MoveType>, /* will be needed to check whether draw can be claimed */
 }
