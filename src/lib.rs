@@ -21,8 +21,8 @@ pub enum Color {
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Piece {
-    piece: PieceType, 
-    color: Color, 
+    pub piece: PieceType, 
+    pub color: Color, 
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -43,10 +43,10 @@ pub struct MoveType {
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Move {
-    start_x: usize,
-    start_y: usize,
-    end_x: usize,
-    end_y: usize,
+    pub start_x: usize,
+    pub start_y: usize,
+    pub end_x: usize,
+    pub end_y: usize,
 }
 
 
@@ -71,8 +71,8 @@ pub enum MoveError {
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Game {
-    board: [[Option<Piece>; 8]; 8],
-    turn: Color, 
+    pub board: [[Option<Piece>; 8]; 8],
+    pub turn: Color, 
     finished: bool, 
     move_history: Vec<MoveType>, /* will be needed to check whether draw can be claimed */
 }
