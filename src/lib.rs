@@ -71,8 +71,8 @@ pub enum MoveError {
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Game {
-    board: [[Option<Piece>; 8]; 8],
-    turn: Color, 
+    pub board: [[Option<Piece>; 8]; 8],
+    pub turn: Color, 
     finished: bool, 
     move_history: Vec<MoveType>, /* will be needed to check whether draw can be claimed */
 }
@@ -137,7 +137,7 @@ impl Game {
         if self.finished {
             return Err(MoveError::Mated);
         }
-        dbg!(mv);
+        // dbg!(mv);
         let the_piece = match self.board[mv.start_y][mv.start_x] {
             None => return Err(MoveError::NoPiece),
             Some(p) => {
@@ -162,8 +162,8 @@ impl Game {
                 Some(p)
             }, 
         };
-        dbg!(the_piece);
-        dbg!(end_square);
+        // dbg!(the_piece);
+        // dbg!(end_square);
 
         match self.legal_movement(&mv, &the_piece, &end_square, capture) { 
             Some(x) => {
@@ -173,28 +173,28 @@ impl Game {
                 // just a normal move
             }
         }
-        dbg!(self.legal_movement(&mv, &the_piece, &end_square, capture));
+        // dbg!(self.legal_movement(&mv, &the_piece, &end_square, capture));
 
         let saved_start: Option<Piece> = self.board[mv.start_y][mv.start_x].clone();
         let saved_end: Option<Piece> = self.board[mv.end_y][mv.end_x].clone();
 
 
-        dbg!(self.board[mv.start_y][mv.start_x]);
-        dbg!(self.board[mv.end_y][mv.end_x]);
+        // dbg!(self.board[mv.start_y][mv.start_x]);
+        // dbg!(self.board[mv.end_y][mv.end_x]);
         // potentially temporarily make the move
         self.board[mv.start_y][mv.start_x] = None;
         self.board[mv.end_y][mv.end_x] = the_piece;
         
         if self.in_check() { 
-            dbg!("thinks in check");
+            // dbg!("thinks in check");
             self.board[mv.start_y][mv.start_x] = saved_start;
             self.board[mv.end_y][mv.end_x] = saved_end;
             return Err(MoveError::SelfCheck);
             // return some in_check error
         }
-        dbg!("after check check");
-        dbg!(self.board[mv.start_y][mv.start_x]);
-        dbg!(self.board[mv.end_y][mv.end_x]);
+        // dbg!("after check check");
+        // dbg!(self.board[mv.start_y][mv.start_x]);
+        // dbg!(self.board[mv.end_y][mv.end_x]);
 
         // else continue to mate check
         let mut safe_move: bool = false;
@@ -202,11 +202,11 @@ impl Game {
         // i'm sure there is a better way or writing this mate check. The complexity is through the
         // roof here.
         // temporarily change color 
-        dbg!(self.turn);
         match self.turn {
             Color::White => self.turn = Color::Black,
             Color::Black => self.turn = Color::White,
         }
+        // dbg!(self.turn);
         'move_gen: for org_y in 0..8 {
             for org_x in 0..8 {
                 for dest_y in 0..8 {
@@ -234,18 +234,29 @@ impl Game {
                                 Some(p)
                             }, 
                         };
+                        if cur_move == (Move {start_x: 5, start_y: 1, end_x: 5, end_y: 2}) {
+                            // dbg!(cur_piece);
+                            // dbg!(cur_end_square);
+                        }
 
                         if self.legal_movement(&cur_move, &cur_piece, &cur_end_square, cur_capture).is_none() {
                             let saved_start: Option<Piece> = self.board[cur_move.start_y][cur_move.start_x].clone();
                             let saved_end: Option<Piece> = self.board[cur_move.end_y][cur_move.end_x].clone();
+                            if cur_move == (Move {start_x: 5, start_y: 1, end_x: 5, end_y: 2}) {
+                                // dbg!("IN");
+                                // dbg!(saved_start);
+                                // dbg!(saved_end);
+                            }
                             self.board[cur_move.start_y][cur_move.start_x] = None; 
                             self.board[cur_move.end_y][cur_move.end_x] = saved_start.clone(); 
                             if !self.in_check() {
                                 safe_move = true; 
+                                self.board[cur_move.start_y][cur_move.start_x] = saved_start; 
+                                self.board[cur_move.end_y][cur_move.end_x] = saved_end; 
+                                break 'move_gen;
                             }
                             self.board[cur_move.start_y][cur_move.start_x] = saved_start; 
                             self.board[cur_move.end_y][cur_move.end_x] = saved_end; 
-                            break 'move_gen;
                         }
                     }
                 }
@@ -256,11 +267,11 @@ impl Game {
             Color::White => self.turn = Color::Black,
             Color::Black => self.turn = Color::White,
         }
-        dbg!(safe_move);
+        // dbg!(safe_move);
         if !safe_move {
             // self.turn has won
             // signal end of game or something
-            dbg!("got here");
+            // dbg!("got here");
             let winner = match self.turn {
                 Color::White => "White",
                 Color::Black => "Black",
@@ -352,7 +363,7 @@ impl Game {
                     return Some(MoveError::Movement);
                 }
                 let y_dif = mv.end_y as isize - mv.start_y as isize;
-                dbg!(y_dif);
+                // dbg!(y_dif);
                 // todo! : make sure the pawn doesnt move back
                 if mv.start_y == 1 || mv.start_y == 6 {
                     if ((y_dif > 2 || y_dif < 1) && self.turn == Color::White) || ((y_dif < -2 || y_dif > -1) && self.turn == Color::Black) {
@@ -391,7 +402,7 @@ impl Game {
 
             }
             PieceType::Rook => {
-                if mv.end_y - mv.start_y != 0 && mv.end_x - mv.end_x != 0 { 
+                if mv.end_y as isize - mv.start_y as isize != 0 && mv.end_x as isize - mv.end_x as isize != 0 { 
                     return Some(MoveError::Movement);
                 }
 
@@ -467,29 +478,29 @@ impl Game {
                     Some(p) => if p.color != self.turn {
                         match p.piece {
                             PieceType::Rook => if min(DX.abs(), DY.abs()) == 0 {
-                                dbg!(p.piece);
+                                // dbg!(p.piece);
                                 checked = true;
                                 break;
                             },
                             PieceType::Bishop => if min(DX.abs(), DY.abs()) != 0 {
-                                dbg!(p.piece);
+                                // dbg!(p.piece);
                                 checked = true;
                                 break;
                             },
                             PieceType::Queen => {
-                                dbg!(p.piece);
+                                // dbg!(p.piece);
                                 checked = true;
                                 break;
                             },
                             PieceType::Pawn => {
                                 match self.turn {
                                     Color::White => if (cur_x - king_x).abs() == 1 && cur_y - king_y == 1 {
-                                        dbg!(p.piece);
+                                        // dbg!(p.piece);
                                         checked = true;
                                         break;
                                     }
                                     Color::Black => if (cur_x - king_x).abs() == 1 && cur_y - king_y == -1 {
-                                        dbg!(p.piece);
+                                        // dbg!(p.piece);
                                         checked = true;
                                         break;
                                     }
@@ -657,6 +668,7 @@ mod tests {
         assert_eq!(base_new_game, fen_game);
     }
 
+    // #[test]
     pub fn check_new_game_wrong() {
         let base_new_game = Game::new_game(); 
         let fen_game = Game::game_from_fen("Rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
@@ -739,5 +751,17 @@ mod tests {
         move_after_mate.do_move(Move{start_x: 4, start_y: 0, end_x: 0, end_y: 4});
         let fen_game = Game::game_from_fen("rnbqkbnr/ppppp2p/5p2/6pQ/3PP3/8/PPP2PPP/RNB1KBNR b KQkq - 1 3");
         assert_eq!(move_after_mate.board, fen_game.board);
+    }
+
+    #[test]
+    pub fn sic_queen() {
+        let mut sic_queen = Game::new_game();
+        sic_queen.do_move(Move{start_x: 3, start_y: 1, end_x: 3, end_y: 3});
+        sic_queen.do_move(Move{start_x: 5, start_y: 6, end_x: 5, end_y: 4});
+        sic_queen.do_move(Move{start_x: 4, start_y: 1, end_x: 4, end_y: 2});
+        sic_queen.do_move(Move{start_x: 4, start_y: 7, end_x: 7, end_y: 4});
+        sic_queen.do_move(Move{start_x: 5, start_y: 1, end_x: 5, end_y: 2});
+        let fen_game = Game::game_from_fen("rnb1kbnr/pp1ppppp/8/q1p5/4P3/2PP4/PP3PPP/RNBQKBNR b KQkq - 0 3");
+        assert_eq!(sic_queen.board, fen_game.board);
     }
 }
