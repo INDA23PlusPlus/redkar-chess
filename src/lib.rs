@@ -758,10 +758,10 @@ mod tests {
         let mut sic_queen = Game::new_game();
         sic_queen.do_move(Move{start_x: 3, start_y: 1, end_x: 3, end_y: 3});
         sic_queen.do_move(Move{start_x: 5, start_y: 6, end_x: 5, end_y: 4});
-        sic_queen.do_move(Move{start_x: 4, start_y: 1, end_x: 4, end_y: 2});
+        sic_queen.do_move(Move{start_x: 4, start_y: 1, end_x: 4, end_y: 3});
         sic_queen.do_move(Move{start_x: 4, start_y: 7, end_x: 7, end_y: 4});
         sic_queen.do_move(Move{start_x: 5, start_y: 1, end_x: 5, end_y: 2});
-        let fen_game = Game::game_from_fen("rnb1kbnr/pp1ppppp/8/q1p5/4P3/2PP4/PP3PPP/RNBQKBNR b KQkq - 0 3");
+        let fen_game = Game::game_from_fen("rnb1kbnr/pp1ppppp/8/q1p5/3PP3/2P5/PP3PPP/RNBQKBNR b KQkq - 0 3");
         assert_eq!(sic_queen.board, fen_game.board);
     }
 }
