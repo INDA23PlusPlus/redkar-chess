@@ -43,10 +43,10 @@ pub struct MoveType {
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Move {
-    start_x: usize,
-    start_y: usize,
-    end_x: usize,
-    end_y: usize,
+    pub start_x: usize,
+    pub start_y: usize,
+    pub end_x: usize,
+    pub end_y: usize,
 }
 
 
