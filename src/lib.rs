@@ -380,7 +380,11 @@ impl Game {
                 }
             }
             PieceType::Knight => {
-
+                let y_dif: isize = (mv.end_y as isize - mv.start_y as isize).abs(); 
+                let x_dif: isize = (mv.end_x as isize - mv.start_x as isize).abs(); 
+                if max(y_dif, x_dif) != 2 || min(y_dif, x_dif) != 1 {
+                    return Some(MoveError::Movement);
+                }
                 // should always have legal Movement at this stage
             }
             PieceType::Bishop => {
