@@ -21,8 +21,8 @@ pub enum Color {
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Piece {
-    piece: PieceType, 
-    color: Color, 
+    pub piece: PieceType, 
+    pub color: Color, 
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
