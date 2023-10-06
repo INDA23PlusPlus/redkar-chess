@@ -441,6 +441,11 @@ impl Game {
                 }
             }
             PieceType::King => {
+                let Y = (mv.end_y as isize - mv.start_y as isize).abs();
+                let X = (mv.end_x as isize - mv.start_x as isize).abs();
+                if max(Y, X) != 1 {
+                    return Some(MoveError::Movement);
+                }
                 // check if the attempted move is dx = 2 (potential attempt to castle)
                 // otherwise there should be no problem
             }
